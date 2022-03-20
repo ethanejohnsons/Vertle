@@ -1,0 +1,15 @@
+.gamePane-button {
+    text-align: center;
+    display: flex;
+    justify-content: space-evenly;
+    width: 20rem;
+    margin: auto;
+}
+
+.gamePane-divider {
+    border: 0;
+    width: 100%;
+    height: 2px;
+    background-color: #222222;
+    opacity: 1.0;
+}

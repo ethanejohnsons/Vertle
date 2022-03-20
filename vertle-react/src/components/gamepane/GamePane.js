@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from 'react-bootstrap';
+import './GamePane.css';
 
 export function GamePane(props) {
     const { width, height, answer, totalVertices } = props;
@@ -13,6 +14,9 @@ export function GamePane(props) {
     const [ isMouseDown, setIsMouseDown ] = useState(false);
     const [ mouseX, setMouseX ] = useState(0);
     const [ mouseY, setMouseY ] = useState(0);
+
+    const [ guessHistory, setGuessHistory ] = useState([]);
+    const [ currentGuess, setCurrentGuess ] = useState(null);
 
     const canvas = useRef(null);
     const vertexRadius = 15;
@@ -87,6 +91,7 @@ export function GamePane(props) {
         map.set('y1', v1.get('y'));
         map.set('x2', v2.get('x'));
         map.set('y2', v2.get('y'));
+        map.set('color', '#222222');
 
         return map;
     }
@@ -96,9 +101,15 @@ export function GamePane(props) {
 
         const drawVertices = (ctx) => {
             ctx.moveTo(0, 0);
-            ctx.fillStyle = '#222222';
+            ctx.lineWidth = 0;
 
             vertices.map(v => {
+                if (currentGuess) {
+                    ctx.fillStyle = currentGuess.get('color');
+                } else {
+                    ctx.fillStyle = v.get('color');
+                }
+
                 ctx.beginPath();
                 ctx.arc(v.get('x'), v.get('y'), vertexRadius, 0, 2 * Math.PI);
                 ctx.fill();
@@ -106,14 +117,20 @@ export function GamePane(props) {
         };
 
         const drawLines = (ctx) => {
-            ctx.strokeStyle = '#222222';
+            ctx.strokeStyle = "#222222";
             ctx.lineWidth = 2;
 
-            linesToDraw.map(l => {
+            const drawLine = (l) => {
                 ctx.moveTo(l.get('x1'), l.get('y1'));
                 ctx.lineTo(l.get('x2'), l.get('y2'));
                 ctx.stroke();
-            });
+            }
+
+            if (currentGuess) {
+                currentGuess.get('lines').map(drawLine);
+            } else {
+                linesToDraw.map(drawLine);
+            }
         }
 
         const drawMouseDownLine = (ctx) => {
@@ -135,20 +152,96 @@ export function GamePane(props) {
         drawLines(ctx);
         drawVertices(ctx);
 
-        if (isMouseDown && currentVertex) {
+        if (isMouseDown && currentVertex && !currentGuess) {
             drawMouseDownLine(ctx);
+        }
+    }
+
+    const onGuessNavigation = (direction) => {
+        if (direction === -1) {
+            if (!currentGuess) {
+                setCurrentGuess(guessHistory.length - 1);
+            } else {
+                setCurrentGuess(guessHistory.indexOf(currentGuess) - 1);
+            }
+        }
+
+        if (direction === 1) {
+            if (!currentGuess) {
+                return;
+            } else if (guessHistory.indexOf(currentGuess) !== guessHistory.length - 1){
+                setCurrentGuess(guessHistory.indexOf(currentGuess) + 1);
+            } else {
+                setCurrentGuess(null);
+            }
         }
     }
 
     const onCheckAnswerClick = () => {
         setIsLoading(true);
 
-        if (state === answer) {
-            alert("YAS QUEEN");
-        } else {
-            alert("NOPE");
+        let correctLines = [];
+
+        for (let i = 0; i < answer.toString(2).length; i++) {
+            let digit = answer.toString(2)[i];
+
+            if (digit === '1') {
+                correctLines.push(answer.toString(2).length - 1 - i);
+            }
         }
 
+        let guess = new Map();
+        let guessVertices = [];
+
+        vertices.map(v => {
+            let lines = getLinesForVertex(v.get('i'));
+
+            let correctLinesForVertex = [];
+            let drawnLinesForVertex = [];
+
+            for (let i = 0; i < lines.length; i++) {
+                for (let j = 0; j < correctLines.length; j++) {
+                    if (lines[i] === correctLines[j]) {
+                        correctLinesForVertex.push(lines[i]);
+                    }
+                }
+
+                for (let j = 0; j < linesToDraw.length; j++) {
+                    if (lines[i] === linesToDraw[j].get('lineNumber')) {
+                        drawnLinesForVertex.push(lines[i])
+                    }
+                }
+            }
+
+            if (correctLinesForVertex.length === drawnLinesForVertex.length) {
+                let areEqual = true;
+
+                for (let i = 0; i < correctLinesForVertex.length; i++) {
+                    for (let j = 0; j < drawnLinesForVertex.length; j++) {
+                        if (correctLinesForVertex[i] !== drawnLinesForVertex[j]) {
+                            areEqual = false;
+                        }
+                    }
+                }
+
+                if (areEqual) {
+                    v.set('color', '#00FF00');
+                } else {
+                    v.set('color', '#FFFF00');
+                }
+            } else if (correctLinesForVertex.length !== 0) {
+                v.set('color', '#222222');
+            }
+
+            let map = new Map();
+            map.set('guessedLines', drawnLinesForVertex.length);
+            map.set('color', v.get('color'));
+            map.set('lines', Array.from(linesToDraw));
+            guessVertices.push(map);
+        });
+
+        guess.set('vertices', guessVertices);
+        guessHistory.push(guess);
         setIsLoading(false);
     };
 
@@ -222,17 +315,38 @@ export function GamePane(props) {
             ( navigator.msMaxTouchPoints > 0 );
     }
 
+    const clear = () => {
+        setLinesToDraw([]);
+        vertices.map(v => v.set('color', '#222222'));
+    }
+
     return (
-        <div className="gamePane">
-            <Button
-                style={{ float: "right" }}
-                variant="outline-dark"
-                disabled={isLoading}
-                onClick={onCheckAnswerClick}
-            >{isLoading ? "Loading..." : "Submit"}
-            </Button>
-            <p>{state.toString(2)}</p>
-            <p>{answer.toString(2)}</p>
+        <div>
+            <div className="gamePane-button">
+                <Button
+                    style={{ borderWidth: 2 }}
+                    onClick={() => onGuessNavigation(-1)}
+                    disabled={guessHistory.length === 0 || guessHistory.indexOf(currentGuess) === 0}
+                    variant="outline-dark">{"<"}</Button>
+                <Button
+                    style={{ width: 100, borderWidth: 2 }}
+                    variant="outline-dark"
+                    disabled={isLoading || linesToDraw.length === 0}
+                    onClick={onCheckAnswerClick}
+                >{isLoading ? "Loading..." : "Submit"}</Button>
+                <Button
+                    style={{ width: 100, borderWidth: 2 }}
+                    variant="outline-dark"
+                    disabled={linesToDraw.length === 0}
+                    onClick={() => clear()}
+                    >Clear</Button>
+                <Button
+                    style={{ borderWidth: 2 }}
+                    onClick={() => onGuessNavigation(1)}
+                    disabled={guessHistory.length === 0 || guessHistory.indexOf(currentGuess) === guessHistory.length - 1 || !currentGuess}
+                    variant="outline-dark">{">"}</Button>
+            </div>
+            <hr size={5} className="gamePane-divider"/>
             <canvas
                 ref={canvas}
                 width={width}
