@@ -4,6 +4,7 @@
   "description": "The backend for Vertle",
   "main": "index.js",
   "scripts": {
+    "start": "node src/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -15,5 +16,8 @@
   "bugs": {
     "url": "https://github.com/ethanejohnsons/Vertle/issues"
   },
-  "homepage": "https://github.com/ethanejohnsons/Vertle#readme"
+  "homepage": "https://github.com/ethanejohnsons/Vertle#readme",
+  "dependencies": {
+    "express": "^4.17.3"
+  }
 }
