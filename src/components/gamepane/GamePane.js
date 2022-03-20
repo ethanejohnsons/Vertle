@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Button } from 'react-bootstrap';
 
 export function GamePane(props) {
     const { width, height, answer, totalVertices } = props;
@@ -7,10 +8,21 @@ export function GamePane(props) {
     const [ vertices, setVertices ] = useState([]);
     const [ linesToDraw, setLinesToDraw ] = useState([]);
     const [ currentVertex, setCurrentVertex ] = useState(null);
+    const [ isLoading, setIsLoading ] = useState(false);
+
+    const [ isMouseDown, setIsMouseDown ] = useState(false);
+    const [ mouseX, setMouseX ] = useState(0);
+    const [ mouseY, setMouseY ] = useState(0);
 
     const canvas = useRef(null);
+    const vertexRadius = 15;
+
+    useEffect(() => render());
 
     useEffect(() => {
+        document.body.style.overflow = "hidden";
+        canvas.current.getContext("2d").imageSmoothingEnabled = false;
+
         const calcGameRadius = () => {
             return width * 0.45;
         }
@@ -40,7 +52,7 @@ export function GamePane(props) {
         });
 
         setVertices(v);
-    });
+    }, [answer]);
 
     /**
      * @param n the index of the vertex
@@ -79,25 +91,21 @@ export function GamePane(props) {
         return map;
     }
 
-    useEffect(() => {
-    }, []);
+    const render = () => {
+        let ctx = canvas.current.getContext("2d");
 
-    useEffect(() => {
-        canvas.current.getContext("2d").imageSmoothingEnabled = false;
-        const drawVertices = () => {
-            let ctx = canvas.current.getContext("2d");
+        const drawVertices = (ctx) => {
             ctx.moveTo(0, 0);
             ctx.fillStyle = '#222222';
 
             vertices.map(v => {
                 ctx.beginPath();
-                ctx.arc(v.get('x'), v.get('y'), 15, 0, 2 * Math.PI);
+                ctx.arc(v.get('x'), v.get('y'), vertexRadius, 0, 2 * Math.PI);
                 ctx.fill();
             });
         };
 
-        const drawLines = () => {
-            let ctx = canvas.current.getContext("2d");
+        const drawLines = (ctx) => {
             ctx.strokeStyle = '#222222';
             ctx.lineWidth = 2;
 
@@ -108,40 +116,164 @@ export function GamePane(props) {
             });
         }
 
-        drawLines();
-        drawVertices();
-    });
+        const drawMouseDownLine = (ctx) => {
+            ctx.strokeStyle = '#222222';
+            ctx.lineWidth = 2;
+
+            let offsetX = canvas.current.offsetLeft;
+            let offsetY = canvas.current.offsetTop;
+
+            let x = currentVertex.get('x');
+            let y = currentVertex.get('y');
+
+            ctx.moveTo(x, y);
+            ctx.lineTo(mouseX - offsetX, mouseY - offsetY);
+            ctx.stroke();
+        }
+
+        ctx.clearRect(0, 0, width, height);
+        drawLines(ctx);
+        drawVertices(ctx);
+
+        if (isMouseDown && currentVertex) {
+            drawMouseDownLine(ctx);
+        }
+    }
+
+    const onCheckAnswerClick = () => {
+        setIsLoading(true);
+
+        if (state === answer) {
+            alert("YAS QUEEN");
+        } else {
+            alert("NOPE");
+        }
+
+        setIsLoading(false);
+    };
+
+    const lineAlreadyExists = (v1, v2) => {
+        let out = false;
+        let newLine = getLineForVertices(v1, v2);
+
+        linesToDraw.map(line => {
+            if (line.get('lineNumber') === newLine.get('lineNumber')) {
+                out = true;
+            }
+        });
+
+        return out;
+    }
 
     const onVertexSelected = (v) => {
         if (currentVertex === null) {
             setCurrentVertex(v);
-        } else if (currentVertex.get('i') !== v.get('i')) {
-            let v1 = currentVertex;
-            let v2 = v;
-            linesToDraw.push(getLineForVertices(v1, v2));
+        } else if (currentVertex.get('i') !== v.get('i') && !lineAlreadyExists(currentVertex, v)) {
+            let line = getLineForVertices(currentVertex, v);
+            linesToDraw.push(line);
             setCurrentVertex(null);
-        } else {
+            setState(state + Math.pow(2, line.get('lineNumber')));
+        } else if (currentVertex.get('i') !== v.get('i') && lineAlreadyExists(currentVertex, v)) {
+            let line = getLineForVertices(currentVertex, v);
+
+            for (let i = 0; i < linesToDraw.length; i++){
+                if (linesToDraw[i].get('lineNumber') === line.get('lineNumber')) {
+                    linesToDraw.splice(i, 1);
+                }
+            }
+
             setCurrentVertex(null);
+            setState(state - Math.pow(2, line.get('lineNumber')));
         }
     };
 
     const onCanvasClick = (event) => {
-        let ex = event.clientX - canvas.current.offsetLeft;
-        let ey = event.clientY - canvas.current.offsetTop;
+        let ex;
+        let ey;
+
+        let offsetX = canvas.current.offsetLeft;
+        let offsetY = canvas.current.offsetTop;
+
+        if (isTouchDevice()) {
+            ex = event.changedTouches.item(0).clientX - offsetX;
+            ey = event.changedTouches.item(0).clientY - offsetY;
+        } else {
+            ex = event.clientX - offsetX;
+            ey = event.clientY - offsetY;
+        }
 
         vertices.map(v => {
             let x = v.get('x');
             let y = v.get('y');
 
-            if (Math.pow(ex - x, 2) + Math.pow(ey - y, 2) < Math.pow(15, 2)) {
+            if (Math.pow(ex - x, 2) + Math.pow(ey - y, 2) < Math.pow(vertexRadius * 2, 2)) {
                 onVertexSelected(v);
             }
-        })
+        });
+
+        if (currentVertex) {
+            setCurrentVertex(null);
+        }
     };
+
+    const isTouchDevice = () => {
+        return ( 'ontouchstart' in window ) ||
+            ( navigator.maxTouchPoints > 0 ) ||
+            ( navigator.msMaxTouchPoints > 0 );
+    }
 
     return (
         <div className="gamePane">
-            <canvas ref={canvas} width={width} height={height} onClick={onCanvasClick}>
+            <Button
+                style={{ float: "right" }}
+                variant="outline-dark"
+                disabled={isLoading}
+                onClick={onCheckAnswerClick}
+            >{isLoading ? "Loading..." : "Submit"}
+            </Button>
+            <p>{state.toString(2)}</p>
+            <p>{answer.toString(2)}</p>
+            <canvas
+                ref={canvas}
+                width={width}
+                height={height}
+                onMouseUp={(e) => {
+                    if (!isTouchDevice()) {
+                        onCanvasClick(e);
+                        setIsMouseDown(false);
+                    }
+                }}
+                onMouseDown={(e) => {
+                    if (!isTouchDevice()) {
+                        onCanvasClick(e);
+                        setIsMouseDown(true);
+                    }
+                }}
+                onMouseMove={(e) => {
+                    if (!isTouchDevice()) {
+                        setMouseX(e.clientX);
+                        setMouseY(e.clientY);
+                    }
+                }}
+
+                onTouchEnd={(e) => {
+                    if (isTouchDevice()) {
+                        setIsMouseDown(false);
+                        onCanvasClick(e);
+                    }
+                }}
+                onTouchStart={(e) => {
+                    if (isTouchDevice()) {
+                        setIsMouseDown(true);
+                        onCanvasClick(e);
+                    }
+                }}
+                onTouchMove={(e) => {
+                    if (isTouchDevice()) {
+                        setMouseX(e.changedTouches.item(0).clientX);
+                        setMouseY(e.changedTouches.item(0).clientY);
+                    }
+                }}>
                 Your browser does not support HTML canvas.
             </canvas>
         </div>

@@ -13,10 +13,10 @@ export default function App() {
 
     useEffect(() => {
         // TODO GET vertices from backend (i.e. retrieve answer of the day)
-        let answer = 0b011001010111001;
+        let answer = 0b111000000000000;
 
         setAnswer(answer);
-        setTotalVertices((1 + Math.sqrt(1 + 8 * (answer.toString(2).length + 1))) / 2);
+        setTotalVertices(Math.floor((1 + Math.sqrt(1 + 8 * (answer.toString(2).length + 1))) / 2));
     }, [refresh]);
 
     return (
