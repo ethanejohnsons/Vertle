@@ -19,6 +19,7 @@
   "homepage": "https://github.com/ethanejohnsons/Vertle#readme",
   "dependencies": {
     "express": "^4.17.3",
+    "forever": "^4.0.3",
     "helmet": "^5.0.2"
   }
 }
