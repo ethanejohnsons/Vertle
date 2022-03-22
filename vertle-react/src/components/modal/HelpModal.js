@@ -3,7 +3,7 @@ import './Modals.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { Modal } from 'react-bootstrap';
 
-export function Help(props) {
+export function HelpModal(props) {
     const { setClosed, isOpen } = props;
 
     return (

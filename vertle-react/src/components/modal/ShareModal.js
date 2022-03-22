@@ -5,7 +5,7 @@ import { BsFillShareFill } from "react-icons/bs";
 import { createShareable} from "../../util/ShareBuilder";
 import './Modals.css';
 
-export function Share(props) {
+export function ShareModal(props) {
     const { setClosed, isOpen, guessHistory, gameNumber } = props;
 
     const onCopy = (text) => {

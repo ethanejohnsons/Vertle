@@ -9,7 +9,14 @@ import { GameState } from '../../model/GameState';
 import './GamePane.css';
 
 export function GamePane(props) {
-    const { width, height, outputGuessHistory, setGameNumber, baseColor, closeColor, correctColor, lastColor } = props;
+    const { width, height, outputGuessHistory, setGameNumber } = props;
+
+    const baseColor = '#222222';
+    const correctColor = '#8DBA69';
+    const closeColor = '#DCC55B';
+    const lastColor = '#AAAAAA';
+
+    const { server } = require('../../config.json');
 
     // Game States
     const [ gameState, setGameState ] = useState(new GameState([], [], baseColor, closeColor, correctColor, lastColor));
@@ -19,7 +26,7 @@ export function GamePane(props) {
     const [ gameHasEnded, setGameHasEnded ] = useState(false);
 
     // Game State - Cookie
-    const [ gameStateCookie, setGameStateCookie ] = useCookies(['game-state']);
+    const [ gameStateCookie, setGameStateCookie ] = useCookies(['gameState']);
 
     // Daily Answer Info
     const [ answer, setAnswer] = useState(0b0);
@@ -37,7 +44,7 @@ export function GamePane(props) {
         document.body.style.overflow = "hidden";
         canvas.current.getContext("2d").imageSmoothingEnabled = false;
 
-        fetch('http://192.168.86.22:4000/daily', {
+        fetch(`${server}/daily`, {
             method: 'GET',
             headers: {
                 accept: 'application/json',
@@ -49,14 +56,14 @@ export function GamePane(props) {
             setupGameState(data.vertices);
         }).catch(err => console.log(err));
 
-        if (gameStateCookie['history'] !== undefined) {
-            // setGuessHistory(gameStateCookie['history']);
-            // setGameHasEnded(gameStateCookie['gameHasEnded']);
-
-            // if (guessHistory.length > 0) {
-            //     setCurrentGuess(guessHistory[guessHistory.length - 1]);
-            // }
-        }
+        // if (gameStateCookie.history.length > 0) {
+        //     setGuessHistory(gameStateCookie.history);
+        //     setGameHasEnded(gameStateCookie.gameHasEnded);
+        //
+        //     if (guessHistory.length > 0) {
+        //         setCurrentGuess(guessHistory[guessHistory.length - 1]);
+        //     }
+        // }
     }, []);
 
     useEffect(() => {
@@ -209,7 +216,7 @@ export function GamePane(props) {
             </div>
             <hr size={5} className="gamePane-divider"/>
             <p style={{ textAlign: "center" }}>{
-                gameHasEnded ? winMessage(6 - guessHistory.length) : `${6 - guessHistory.length} guesses left.`}
+                gameHasEnded ? winMessage(6 - guessHistory.length) : `${6 - guessHistory.length} guess${6 - guessHistory.length === 1 ? `` : `es`} left.`}
             </p>
             <canvas
                 ref={canvas}

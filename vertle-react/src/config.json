@@ -1,0 +1,11 @@
+{
+  "version": "1.0.0",
+  "server": "http://192.168.86.22:4000",
+
+  "social": {
+    "buymeacoffee": "https://www.buymeacoffee.com/EthanJohnson",
+    "github": "https://github.com/ethanejohnsons",
+    "twitter": "https://twitter.com/ethanejohnsons",
+    "email": "ethan@ejohnsons.com"
+  }
+}

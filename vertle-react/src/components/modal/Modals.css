@@ -23,6 +23,23 @@
     text-align: right;
 }
 
+.m-profile {
+    margin-left: 9%;
+    float: left;
+    border-width: 2px;
+    border-color: #222222;
+    background-color: #fdfff5;
+    text-align: center;
+    width: 7.5rem;
+    height: 7.5rem;
+}
+
+.m-icon {
+    margin-left: 0.5rem;
+    margin-top: 0.75rem;
+    font-size: 1.75rem;
+}
+
 .m-shareable {
     white-space: pre-line;
     text-align: center;
