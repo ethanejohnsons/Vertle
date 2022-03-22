@@ -1,25 +1,20 @@
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { Modal, Button } from 'react-bootstrap';
 import { BsFillShareFill } from "react-icons/bs";
+import React, { useEffect, useState } from "react";
 
 import { createShareable} from "../../util/ShareBuilder";
 import './Modals.css';
 
 export function ShareModal(props) {
     const { setClosed, isOpen, guessHistory, gameNumber } = props;
+    const [ text, setText ] = useState("");
 
-    const onCopy = (text) => {
-        navigator.clipboard.writeText(text).then(() => {
-            console.log('Copying to clipboard was successful!');
-        }, err => {
-            console.error('Could not copy text: ', err);
-        });
-    };
+    useEffect(() => {
+        setText(createShareable(gameNumber, guessHistory));
+    }, [guessHistory, gameNumber]);
 
-    const getMessage = () => {
-        let text = createShareable(gameNumber, guessHistory);
-
-        return (
+    const getMessage = () =>
             <div>
                 <header className="m-head">Share this game with your friends!</header>
                 <div className="m-body">
@@ -30,16 +25,14 @@ export function ShareModal(props) {
                     { guessHistory.length > 0 &&
                         <div className="m-shareable">
                             <p>{ text }</p>
-                            <Button variant="outline-dark" onClick={() => onCopy(text)}>
+                            <Button variant="outline-dark">
                                 {"Copy to Clipboard "}
                                 <BsFillShareFill/>
                             </Button>
                         </div>
                     }
                 </div>
-            </div>
-        );
-    }
+            </div>;
 
     return (
         <Modal show={isOpen} onHide={setClosed}>

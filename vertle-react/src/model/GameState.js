@@ -1,4 +1,5 @@
 import {Line} from "./Line";
+import {Vertex} from "./Vertex";
 
 export class GameState {
     constructor(vertices, lines, baseColor, closeColor, correctColor, lastColor) {
@@ -11,6 +12,11 @@ export class GameState {
         this.closeColor = closeColor;
         this.correctColor = correctColor;
         this.lastColor = lastColor;
+    }
+
+    cleanFromJSON() {
+        this.vertices = this.vertices.map(vertex => new Vertex(vertex.index, vertex.x, vertex.y, vertex.color, vertex.radius));
+        this.lines = this.lines.map(line => new Line(line.index, line.x1, line.y1, line.x2, line.y2, line.color, line.width));
     }
 
     draw(ctx) {
