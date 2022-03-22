@@ -1,30 +1,35 @@
-import React, { useEffect, useState } from 'react';
-
 import { GamePane } from './components/gamepane/GamePane';
 import { Navbar } from './components/navbar/Navbar';
 import './App.css';
 
+import React, { useState } from "react";
+
 export default function App() {
-    const [ refresh, setRefresh ] = useState(false);
-    const [ answer, setAnswer ] = useState(0b0);
-    const [ width, setWidth ] = useState(window.innerWidth < 500 ? window.innerWidth - (window.innerWidth * 0.1) : 500);
-    const [ height, setHeight ] = useState(500);
-    const [ totalVertices, setTotalVertices ] = useState(0);
+    const width = window.innerWidth < 500 ? window.innerWidth - (window.innerWidth * 0.1) : 500;
+    const height = 500;
 
-    useEffect(() => {
-        // TODO GET vertices from backend (i.e. retrieve answer of the day)
-        let answer = 0b111000000000000;
+    const baseColor = '#222222';
+    const correctColor = '#8DBA69';
+    const closeColor = '#DCC55B';
+    const lastColor = '#AAAAAA';
 
-        setAnswer(answer);
-        setTotalVertices(Math.floor((1 + Math.sqrt(1 + 8 * (answer.toString(2).length + 1))) / 2));
-    }, [refresh]);
+    const [ guessHistory, setGuessHistory ] = useState([]);
+    const [ gameNumber, setGameNumber ] = useState(0);
 
     return (
         <div className="vertle-all">
             <div className="vertle-game">
-                <Navbar/>
+                <Navbar guessHistory={guessHistory} gameNumber={gameNumber}/>
                 <hr size={5} className="vertle-divider"/>
-                <GamePane width={width} height={height} answer={answer} totalVertices={totalVertices} />
+                <GamePane
+                    width={width}
+                    height={height}
+                    outputGuessHistory={setGuessHistory}
+                    setGameNumber={setGameNumber}
+                    baseColor={baseColor}
+                    correctColor={correctColor}
+                    closeColor={closeColor}
+                    lastColor={lastColor}/>
             </div>
         </div>
     );
