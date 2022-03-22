@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "server": "http://192.168.86.22:4000",
+  "server": "http://vertle-game.com/api",
 
   "social": {
     "buymeacoffee": "https://www.buymeacoffee.com/EthanJohnson",
