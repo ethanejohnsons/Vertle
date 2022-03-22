@@ -72,6 +72,7 @@ export function GamePane(props) {
         }
     }, []);
 
+    // Write to cookie so that state persists for the rest of the day.
     useEffect(() => {
         removeCookie('history');
         removeCookie('gameHasEnded');
@@ -83,7 +84,7 @@ export function GamePane(props) {
         setCookie("history", LZString.compressToBase64(JSON.stringify(guessHistory)), { expires: date });
         setCookie("gameHasEnded", gameHasEnded.toString(), {  expires: date });
         setCookie("hasWon", hasWon, { expires: date });
-    }, [hasWon, gameHasEnded]);
+    }, [currentGuess, guessHistory, hasWon, gameHasEnded]);
 
     const render = () => {
         let ctx = canvas.current.getContext("2d");
@@ -148,24 +149,22 @@ export function GamePane(props) {
         setGuessHistory(history);
     };
 
-    const onCanvasClick = (event) => {
-        let ex;
-        let ey;
-        let offsetX = canvas.current.offsetLeft;
-        let offsetY = canvas.current.offsetTop;
+    useEffect(() => {
+        if (!gameHasEnded && isMouseDown) {
+            let offsetX = canvas.current.offsetLeft;
+            let offsetY = canvas.current.offsetTop;
+            let ex = mouseX - offsetX;
+            let ey = mouseY - offsetY;
 
-        if (isTouchDevice()) {
-            ex = event.changedTouches.item(0).clientX - offsetX;
-            ey = event.changedTouches.item(0).clientY - offsetY;
+            gameState.vertices.forEach(vertex => {
+                if (vertex.isCursorOver(ex, ey)) {
+                    vertex.onClick(gameState, currentVertex, setCurrentVertex)
+                }
+            });
         } else {
-            ex = event.clientX - offsetX;
-            ey = event.clientY - offsetY;
-        }
-
-        if (!gameHasEnded && !gameState.onClick(ex, ey, currentVertex, setCurrentVertex)) {
             setCurrentVertex(null);
         }
-    };
+    }, [mouseX, mouseY, isMouseDown]);
 
     const isTouchDevice = () => {
         return ( 'ontouchstart' in window ) ||
@@ -177,7 +176,7 @@ export function GamePane(props) {
         let gameState = new GameState([], [], baseColor, closeColor, correctColor, lastColor);
 
         Array(vertexCount).fill(null).map((_, i) => i).map(i => {
-            let pos = Vertex.getPosition(i, vertexCount, width * 0.45);
+            let pos = Vertex.getPosition(i, vertexCount, Math.min(width * 0.45, height * 0.45));
             let x = pos[0] + (width * 0.5);
             let y = pos[1] + (height * 0.5);
             gameState.vertices.push(new Vertex(i, x, y, gameState.baseColor));
@@ -244,13 +243,15 @@ export function GamePane(props) {
                 height={height}
                 onMouseUp={(e) => {
                     if (!isTouchDevice()) {
-                        onCanvasClick(e);
+                        setMouseX(e.clientX);
+                        setMouseX(e.clientY);
                         setIsMouseDown(false);
                     }
                 }}
                 onMouseDown={(e) => {
                     if (!isTouchDevice()) {
-                        onCanvasClick(e);
+                        setMouseX(e.clientX);
+                        setMouseX(e.clientY);
                         setIsMouseDown(true);
                     }
                 }}
@@ -266,7 +267,6 @@ export function GamePane(props) {
                         setIsMouseDown(false);
                         setMouseX(e.changedTouches.item(0).pageX);
                         setMouseY(e.changedTouches.item(0).pageY);
-                        onCanvasClick(e);
                     }
                 }}
                 onTouchStart={(e) => {
@@ -274,7 +274,6 @@ export function GamePane(props) {
                         setIsMouseDown(true);
                         setMouseX(e.changedTouches.item(0).pageX);
                         setMouseY(e.changedTouches.item(0).pageY);
-                        onCanvasClick(e);
                     }
                 }}
                 onTouchMove={(e) => {

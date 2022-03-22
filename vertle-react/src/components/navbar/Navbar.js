@@ -1,9 +1,10 @@
-import './Navbar.css';
+import React, { useState } from "react";
+
 import {ShareModal} from '../modal/ShareModal.js';
 import {HelpModal} from '../modal/HelpModal.js';
 import {SupportModal} from '../modal/SupportModal.js';
+import './Navbar.css';
 
-import React, { useState } from "react";
 import { BsShare, BsQuestionCircle, BsCup } from "react-icons/bs";
 
 export function Navbar(props) {

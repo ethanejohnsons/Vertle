@@ -7,8 +7,9 @@ import { useCookies} from 'react-cookie';
 import {version} from "./config.json";
 
 export default function App() {
+    const heightOffest = window.innerHeight - 300;
+    const height = heightOffest < 500 ? heightOffest - (heightOffest * 0.1) : 500;
     const width = window.innerWidth < 500 ? window.innerWidth - (window.innerWidth * 0.1) : 500;
-    const height = 500;
 
     const { version } = require('./config.json');
 
@@ -24,7 +25,9 @@ export default function App() {
                 <hr size={5} className="vertle-divider"/>
                 <GamePane width={width} height={height} outputGuessHistory={setGuessHistory} setGameNumber={setGameNumber} cookie={cookie} setCookie={setCookie} removeCookie={removeCookie}/>
             </div>
-            <p className="vertle-footer">Create by Ethan Johnson v{version}</p>
+            <div className="vertle-footer">
+                <p>{`v${version}\nCreated by Ethan Johnson`}</p>
+            </div>
         </div>
     );
 }

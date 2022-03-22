@@ -25,9 +25,12 @@ html {
 .vertle-footer {
   bottom: 0;
   right: 0;
+  text-align: right;
   margin-right: 1rem;
+  margin-bottom: 1rem;
   position: fixed;
   color: #aaaaaa;
+  white-space: pre-line;
 }
 
 @media (min-width: 500px) {

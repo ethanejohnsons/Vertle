@@ -23,7 +23,7 @@ export class Vertex {
         ctx.fill();
     }
 
-    wasClicked(x, y) {
+    isCursorOver(x, y) {
         return Math.pow(x - this.x, 2) + Math.pow(y - this.y, 2) < Math.pow(this.radius * 2, 2);
     }
 

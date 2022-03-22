@@ -24,20 +24,6 @@ export class GameState {
         this.vertices.forEach(vertex => vertex.draw(ctx));
     }
 
-    onClick(x, y, currentVertex, setCurrentVertex) {
-        let clicked = false;
-
-        this.vertices.map(v => {
-            if (v.wasClicked(x, y)) {
-                if (v.onClick(this, currentVertex, setCurrentVertex)) {
-                    clicked = true;
-                }
-            }
-        });
-
-        return clicked;
-    }
-
     verifyAndReturn(answer) {
         // Generate a list of all the correct lines based on the binary.
         let correctLines = [];
@@ -80,7 +66,7 @@ export class GameState {
             }
 
             // Correct number of lines to vertex. Will at least be partially correct.
-            if (correctLinesForVertex.length === drawnLinesForVertex.length) {
+            if (correctLinesForVertex.length > 0 && correctLinesForVertex.length === drawnLinesForVertex.length) {
                 // Check if all lines are actually correct. Green color.
                 if (correctLinesForVertex.sort().join(',') === drawnLinesForVertex.sort().join(',')) {
                     vertex.color = this.correctColor;
@@ -89,10 +75,6 @@ export class GameState {
                 } else {
                     vertex.color = this.closeColor;
                 }
-
-            // Else gray (if # of lines is not zero).
-            } else if (correctLinesForVertex.length !== 0) {
-                vertex.color = this.baseColor;
             }
         });
 
