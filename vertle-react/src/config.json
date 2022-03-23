@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "server": "http://vertle-game.com/api",
+  "server": "https://vertle-game.com/api",
 
   "social": {
     "buymeacoffee": "https://www.buymeacoffee.com/EthanJohnson",
