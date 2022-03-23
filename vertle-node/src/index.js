@@ -44,7 +44,7 @@ const server = app.listen(4000, () => {
     console.log("Vertle API listening at http://%s:%s", host, port);
 });
 
-app.get('daily', (req, res) => {
+app.get('/daily', (req, res) => {
     res.header("Access-Control-Allow-Origin", "*");
     res.end(JSON.stringify(getAnswerOfTheDay()));
 });
