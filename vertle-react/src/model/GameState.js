@@ -66,9 +66,9 @@ export class GameState {
             }
 
             // Correct number of lines to vertex. Will at least be partially correct.
-            if (correctLinesForVertex.length > 0 && correctLinesForVertex.length === drawnLinesForVertex.length) {
+            if (correctLinesForVertex.length === drawnLinesForVertex.length) {
                 // Check if all lines are actually correct. Green color.
-                if (correctLinesForVertex.sort().join(',') === drawnLinesForVertex.sort().join(',')) {
+                if (correctLinesForVertex.length === 0 || correctLinesForVertex.sort().join(',') === drawnLinesForVertex.sort().join(',')) {
                     vertex.color = this.correctColor;
 
                 // Else yellow
