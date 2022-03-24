@@ -2,9 +2,19 @@ import {Line} from "./Line";
 import {Vertex} from "./Vertex";
 
 export class GameState {
-    static generateAnswerState(answer, vertexCount, width, height, correctColor) {
+
+    // horrendous
+    static generateAnswerState(answer, vertexCount, width, height, baseColor, correctColor) {
         let vertices = [];
         let lines = [];
+        let connectedLines = [];
+        let linesForLater = [];
+
+        Array(answer.toString(2).length).fill(null).map((_, i) => i).map(i => {
+            if (answer.toString(2)[i] === '1') {
+                connectedLines.push(i);
+            }
+        });
 
         Array(vertexCount).fill(null).map((_, i) => i).map(i => {
             let pos = Vertex.getPosition(i, vertexCount, Math.min(width * 0.45, height * 0.45));
@@ -12,13 +22,30 @@ export class GameState {
             let y = pos[1] + (height * 0.5);
             let v = new Vertex(i, x, y, correctColor);
             vertices.push(v);
+
+            let possibleLines = Line.fromVertex(v);
+
+            for (let j = 0; j < possibleLines.length; j++) {
+                for (let k = 0; k < connectedLines.length; k++) {
+                    if (possibleLines[j] === connectedLines[k]) {
+                        linesForLater.push({
+                            index: possibleLines[j],
+                            v: v
+                        });
+                    }
+                }
+            }
         });
 
-        Array(answer.toString(2).length).fill(null).map((_, i) => i).map(i => {
-            let line = new Line(i, );
+        linesForLater.forEach(l1 => {
+            linesForLater.forEach(l2 => {
+                if (l1.index === l2.index) {
+                    lines.push(new Line(l1.index, l1.v.x, l1.v.y, l2.v.x, l2.v.y, baseColor));
+                }
+            });
         });
 
-        return new GameState(vertices, lines, null, null, correctColor, null);
+        return new GameState(vertices, lines, baseColor, null, correctColor, null);
     }
 
     constructor(vertices, lines, baseColor, closeColor, correctColor, lastColor, verified = false) {
