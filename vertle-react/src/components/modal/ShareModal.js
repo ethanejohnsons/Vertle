@@ -17,7 +17,7 @@ export function ShareModal(props) {
     }, [guessHistory, gameNumber]);
 
     const onShare = () => {
-        if (navigator.share) {
+        if (navigator.share && navigator.userAgent.includes("Mobile")) {
             navigator.share({ text }).then(() => {
                 setIsToastVisible(true);
             }).catch(console.error);

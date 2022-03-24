@@ -26,7 +26,7 @@ export default function App() {
                 <GamePane width={width} height={height} outputGuessHistory={setGuessHistory} setGameNumber={setGameNumber} cookie={cookie} setCookie={setCookie} removeCookie={removeCookie}/>
             </div>
             <div className="vertle-footer">
-                <p>{`v${version}\nCreated by Ethan Johnson`}</p>
+                <p>{`v${version}`}</p>
             </div>
         </div>
     );

@@ -16,11 +16,18 @@ export class Vertex {
         this.color = color;
     }
 
-    draw(ctx) {
+    draw(ctx, connections) {
         ctx.fillStyle = this.color;
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.radius, 0, 2 * Math.PI);
         ctx.fill();
+
+        if (connections) {
+            ctx.fillStyle = '#fdfff5';
+            ctx.font = '15px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(connections, this.x, this.y + 5);
+        }
     }
 
     isCursorOver(x, y) {

@@ -9,16 +9,17 @@ import './GamePane.css';
 
 export function GamePane(props) {
     const { width, height, outputGuessHistory, setGameNumber, cookie, setCookie, removeCookie } = props;
+    const moment = require('moment');
 
     const baseColor = '#222222';
     const correctColor = '#8DBA69';
     const closeColor = '#DCC55B';
     const lastColor = '#AAAAAA';
 
-    const { server } = require('../../config.json');
+    const { server, devServer, isDev } = require('../../config.json');
 
     // Game States
-    const [ gameState, setGameState ] = useState(new GameState([], [], baseColor, closeColor, correctColor, lastColor));
+    const [ gameState, setGameState ] = useState(new GameState([], [], baseColor, closeColor, correctColor, lastColor, width, height, false));
     const [ guessHistory, setGuessHistory ] = useState([]);
     const [ currentGuess, setCurrentGuess ] = useState(null);
     const [ currentVertex, setCurrentVertex ] = useState(null);
@@ -26,7 +27,7 @@ export function GamePane(props) {
     const [ hasWon, setHasWon ] = useState(false);
 
     // Daily Answer Info
-    const [ answer, setAnswer] = useState(0b0);
+    const [ answer, setAnswer] = useState("");
     const [ vertexCount, setVertexCount ] = useState(0);
 
     // Canvas/Mouse States
@@ -41,13 +42,16 @@ export function GamePane(props) {
         document.body.style.overflow = "hidden";
         canvas.current.getContext("2d").imageSmoothingEnabled = false;
 
-        fetch(`${server}/daily`, {
+        let api = isDev ? devServer : server;
+        let date = moment().format('YYYY-MM-DD');
+
+        fetch(`${api}/daily?date=${date}`, {
             method: 'GET',
             headers: {
                 accept: 'application/json',
-            },
+            }
         }).then(response => response.json()).then(data => {
-            setAnswer(parseInt(data.answer, 2));
+            setAnswer(data.answer);
             setVertexCount(data.vertices);
             setGameNumber(data.gameNumber);
             setupGameState(data.vertices);
@@ -55,22 +59,23 @@ export function GamePane(props) {
 
         if (guessHistory.length === 0 && cookie['history']) {
             let history = JSON.parse(LZString.decompressFromBase64(cookie['history']));
-            history = history.map(state => new GameState(state.vertices, state.lines, baseColor, closeColor, correctColor, lastColor));
+            history = history.map(state => new GameState(state.vertices, state.lines, baseColor, closeColor, correctColor, lastColor, state.verified));
             history.forEach(state => state.cleanFromJSON());
 
             setGuessHistory(history);
             setGameHasEnded(cookie['gameHasEnded'] === 'true');
             setHasWon(cookie['hasWon'] === 'true');
-
-            if (history.length > 0) {
-                setCurrentGuess(history[history.length - 1]);
-            }
+            setCurrentGuess(gameState);
 
             if (cookie['gameHasEnded'] === 'true') {
                 outputGuessHistory(history);
             }
         }
     }, []);
+
+    useEffect(() => {
+        setCurrentGuess(gameState);
+    }, [gameState])
 
     // Write to cookie so that state persists for the rest of the day.
     useEffect(() => {
@@ -107,26 +112,51 @@ export function GamePane(props) {
             }
         }
 
+        if (currentGuess === gameState) {
+            drawDraggable();
+        }
+
         if (currentGuess) {
-            currentGuess.lines.forEach(line => line.draw(ctx));
-            gameState.lines.forEach(line => line.draw(ctx));
-            drawDraggable();
-            currentGuess.vertices.forEach(vertex => vertex.draw(ctx));
-        } else {
-            drawDraggable();
-            gameState.draw(ctx);
+            if (currentGuess === gameState && guessHistory[guessHistory.length - 1]) {
+                currentGuess.lines.forEach(line => line.draw(ctx));
+                guessHistory[guessHistory.length - 1].vertices.forEach(vertex => {
+                    let possibleLines = Line.fromVertex(vertex);
+                    let connectedLines = 0;
+
+                    for (let i = 0; i < possibleLines.length; i++) {
+                        for (let j = 0; j < guessHistory[guessHistory.length - 1].lines.length; j++) {
+                            if (possibleLines[i] === guessHistory[guessHistory.length - 1].lines[j].index) {
+                                connectedLines++;
+                            }
+                        }
+                    }
+
+                    vertex.draw(ctx, connectedLines);
+                });
+
+            } else {
+                currentGuess.draw(ctx);
+            }
         }
     }
 
     const onGuessNavigation = (direction) => {
         let index = guessHistory.indexOf(currentGuess);
 
-        if (direction === -1 && index > 0) {
-            setCurrentGuess(guessHistory[index - 1]);
+        if (direction === -1){
+            if (currentGuess === gameState) {
+                setCurrentGuess(guessHistory[guessHistory.length - 1]);
+            } else {
+                setCurrentGuess(guessHistory[index - 1]);
+            }
         }
 
-        if (direction === 1 && index < guessHistory.length - 1) {
-            setCurrentGuess(guessHistory[index + 1]);
+        if (direction === 1) {
+            if (index === guessHistory.length - 1) {
+                setCurrentGuess(gameState);
+            } else {
+                setCurrentGuess(guessHistory[index + 1]);
+            }
         }
     }
 
@@ -134,21 +164,20 @@ export function GamePane(props) {
         let history = guessHistory;
         let guess = gameState.verifyAndReturn(answer);
         let gameHasEnded = false;
-        history.push(guess);
-        setCurrentGuess(guess);
 
-        if (guess.hasWon || history.length === 6) {
+        if (guess.hasWon || history.length >= 5) {
             outputGuessHistory(history);
             gameHasEnded = true;
-        } else {
-            setupGameState(vertexCount);
         }
 
+        setupGameState(vertexCount);
+        history.push(guess);
         setGameHasEnded(gameHasEnded);
         setHasWon(guess.hasWon);
         setGuessHistory(history);
     };
 
+    // On mouse click or move
     useEffect(() => {
         if (!gameHasEnded && isMouseDown) {
             let offsetX = canvas.current.offsetLeft;
@@ -161,19 +190,17 @@ export function GamePane(props) {
                     vertex.onClick(gameState, currentVertex, setCurrentVertex)
                 }
             });
+
+            if (isMouseDown && currentGuess !== gameState) {
+                setCurrentGuess(gameState);
+            }
         } else {
             setCurrentVertex(null);
         }
     }, [mouseX, mouseY, isMouseDown]);
 
-    const isTouchDevice = () => {
-        return ( 'ontouchstart' in window ) ||
-            ( navigator.maxTouchPoints > 0 ) ||
-            ( navigator.msMaxTouchPoints > 0 );
-    }
-
     const setupGameState = (vertexCount) => {
-        let gameState = new GameState([], [], baseColor, closeColor, correctColor, lastColor);
+        let gameState = new GameState([], [], baseColor, closeColor, correctColor, lastColor, false);
 
         Array(vertexCount).fill(null).map((_, i) => i).map(i => {
             let pos = Vertex.getPosition(i, vertexCount, Math.min(width * 0.45, height * 0.45));
@@ -184,6 +211,8 @@ export function GamePane(props) {
 
         setGameState(gameState);
         setCurrentVertex(null);
+        setCurrentGuess(gameState);
+        return gameState;
     }
 
     const endMessage = (guessesLeft) => {
@@ -213,7 +242,7 @@ export function GamePane(props) {
                 <Button
                     style={{ borderWidth: 2 }}
                     onClick={() => onGuessNavigation(-1)}
-                    disabled={guessHistory.length === 0 || guessHistory.indexOf(currentGuess) === 0}
+                    disabled={guessHistory.length === 0 || guessHistory[0] === currentGuess}
                     variant="outline-dark">{"<"}</Button>
                 <Button
                     style={{ width: 100, borderWidth: 2 }}
@@ -230,7 +259,7 @@ export function GamePane(props) {
                 <Button
                     style={{ borderWidth: 2 }}
                     onClick={() => onGuessNavigation(1)}
-                    disabled={guessHistory.length === 0 || guessHistory.indexOf(currentGuess) === guessHistory.length - 1 || !currentGuess}
+                    disabled={currentGuess === gameState}
                     variant="outline-dark">{">"}</Button>
             </div>
             <hr size={5} className="gamePane-divider"/>
@@ -242,45 +271,33 @@ export function GamePane(props) {
                 width={width}
                 height={height}
                 onMouseUp={(e) => {
-                    if (!isTouchDevice()) {
-                        setMouseX(e.clientX);
-                        setMouseX(e.clientY);
-                        setIsMouseDown(false);
-                    }
+                    setMouseX(e.clientX);
+                    setMouseX(e.clientY);
+                    setIsMouseDown(false);
                 }}
                 onMouseDown={(e) => {
-                    if (!isTouchDevice()) {
-                        setMouseX(e.clientX);
-                        setMouseX(e.clientY);
-                        setIsMouseDown(true);
-                    }
+                    setMouseX(e.clientX);
+                    setMouseX(e.clientY);
+                    setIsMouseDown(true);
                 }}
                 onMouseMove={(e) => {
-                    if (!isTouchDevice()) {
-                        setMouseX(e.clientX);
-                        setMouseY(e.clientY);
-                    }
+                    setMouseX(e.clientX);
+                    setMouseY(e.clientY);
                 }}
 
                 onTouchEnd={(e) => {
-                    if (isTouchDevice()) {
-                        setIsMouseDown(false);
-                        setMouseX(e.changedTouches.item(0).pageX);
-                        setMouseY(e.changedTouches.item(0).pageY);
-                    }
+                    setIsMouseDown(false);
+                    setMouseX(e.changedTouches.item(0).pageX);
+                    setMouseY(e.changedTouches.item(0).pageY);
                 }}
                 onTouchStart={(e) => {
-                    if (isTouchDevice()) {
-                        setIsMouseDown(true);
-                        setMouseX(e.changedTouches.item(0).pageX);
-                        setMouseY(e.changedTouches.item(0).pageY);
-                    }
+                    setIsMouseDown(true);
+                    setMouseX(e.changedTouches.item(0).pageX);
+                    setMouseY(e.changedTouches.item(0).pageY);
                 }}
                 onTouchMove={(e) => {
-                    if (isTouchDevice()) {
-                        setMouseX(e.changedTouches.item(0).pageX);
-                        setMouseY(e.changedTouches.item(0).pageY);
-                    }
+                    setMouseX(e.changedTouches.item(0).pageX);
+                    setMouseY(e.changedTouches.item(0).pageY);
                 }}>
                 Your browser does not support HTML canvas.
             </canvas>
