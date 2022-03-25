@@ -46,30 +46,6 @@ export function GamePane(props) {
         let date = moment().format('YYYY-MM-DD');
         let gameHasEnded = false;
 
-        if (guessHistory.length === 0 && cookie['history']) {
-            let history = JSON.parse(LZString.decompressFromBase64(cookie['history']));
-            history = history.map(state => new GameState(state.vertices, state.lines, baseColor, closeColor, correctColor, lastColor, state.verified));
-            history.forEach(state => state.cleanFromJSON());
-
-            gameHasEnded = cookie['gameHasEnded'] === 'true';
-
-            setGuessHistory(history);
-            setGameHasEnded(gameHasEnded);
-            setHasWon(cookie['hasWon'] === 'true');
-
-            if (cookie['gameHasEnded'] === 'true') {
-                let answerState = GameState.generateAnswerState(cookie["answer"], 6, width, height, baseColor, correctColor);
-                setGameState(answerState);
-                setCurrentGuess(answerState);
-            } else {
-                setCurrentGuess(gameState);
-            }
-
-            if (cookie['gameHasEnded'] === 'true') {
-                outputGuessHistory(history);
-            }
-        }
-
         if (!gameHasEnded) {
             fetch(`${api}/daily?date=${date}`, {
                 method: 'GET',
@@ -81,6 +57,30 @@ export function GamePane(props) {
                 setVertexCount(data.vertices);
                 setGameNumber(data.gameNumber);
                 setupGameState(data.vertices);
+
+                if (guessHistory.length === 0 && cookie['history']) {
+                    let history = JSON.parse(LZString.decompressFromBase64(cookie['history']));
+                    history = history.map(state => new GameState(state.vertices, state.lines, baseColor, closeColor, correctColor, lastColor, state.verified));
+                    history.forEach(state => state.cleanFromJSON());
+
+                    gameHasEnded = cookie['gameHasEnded'] === 'true';
+
+                    setGuessHistory(history);
+                    setGameHasEnded(gameHasEnded);
+                    setHasWon(cookie['hasWon'] === 'true');
+
+                    if (cookie['gameHasEnded'] === 'true') {
+                        let answerState = GameState.generateAnswerState(data.answer, data.vertices, width, height, baseColor, correctColor);
+                        setGameState(answerState);
+                        setCurrentGuess(answerState);
+                    } else {
+                        setCurrentGuess(gameState);
+                    }
+
+                    if (cookie['gameHasEnded'] === 'true') {
+                        outputGuessHistory(history);
+                    }
+                }
             }).catch(err => console.log(err));
         }
     }, []);
@@ -94,7 +94,6 @@ export function GamePane(props) {
         removeCookie('history');
         removeCookie('gameHasEnded');
         removeCookie('hasWon');
-        removeCookie('answer');
 
         let date = new Date();
         date.setDate(date.getDate() + 1);
@@ -102,7 +101,6 @@ export function GamePane(props) {
         setCookie("history", LZString.compressToBase64(JSON.stringify(guessHistory)), { expires: date });
         setCookie("gameHasEnded", gameHasEnded.toString(), {  expires: date });
         setCookie("hasWon", hasWon, { expires: date });
-        setCookie("answer", answer, { expires: date});
     }, [currentGuess, guessHistory, hasWon, gameHasEnded]);
 
     const render = () => {
@@ -131,7 +129,7 @@ export function GamePane(props) {
         }
 
         if (currentGuess) {
-            if (!gameHasEnded && !currentGuess === gameState && guessHistory[guessHistory.length - 1]) {
+            if (!gameHasEnded && currentGuess === gameState && guessHistory[guessHistory.length - 1]) {
                 currentGuess.lines.forEach(line => line.draw(ctx));
                 guessHistory[guessHistory.length - 1].vertices.forEach(vertex => {
                     let possibleLines = Line.fromVertex(vertex);
@@ -190,7 +188,7 @@ export function GamePane(props) {
             }
         }
 
-        if (!(history.length >= 5)) {
+        if (!(history.length >= 5) && !guess.hasWon) {
             setupGameState(vertexCount);
         }
 

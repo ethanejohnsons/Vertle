@@ -12,7 +12,7 @@ export class GameState {
 
         Array(answer.toString(2).length).fill(null).map((_, i) => i).map(i => {
             if (answer.toString(2)[i] === '1') {
-                connectedLines.push(i);
+                connectedLines.push(14 - i);
             }
         });
 
