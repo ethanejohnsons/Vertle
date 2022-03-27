@@ -2,6 +2,10 @@ import {Line} from "./Line";
 import {Vertex} from "./Vertex";
 
 export class GameState {
+    static baseColor = '#222222';
+    static correctColor = '#8DBA69';
+    static closeColor = '#DCC55B';
+    static lastColor = '#AAAAAA';
 
     // horrendous
     static generateAnswerState(answer, vertexCount, width, height, baseColor, correctColor) {
@@ -48,18 +52,10 @@ export class GameState {
         return new GameState(vertices, lines, baseColor, null, correctColor, null);
     }
 
-    constructor(vertices, lines, baseColor, closeColor, correctColor, lastColor, verified = false) {
+    constructor(vertices, lines) {
         this.vertices = vertices;
         this.lines = lines;
-        this.hasWon = false;
         this.binary = 0b0;
-
-        this.baseColor = baseColor;
-        this.closeColor = closeColor;
-        this.correctColor = correctColor;
-        this.lastColor = lastColor;
-
-        this.verified = verified;
     }
 
     cleanFromJSON() {

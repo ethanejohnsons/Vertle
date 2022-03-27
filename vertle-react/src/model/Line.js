@@ -42,7 +42,7 @@ export class Line {
 
     static drawDraggable(ctx, originX, originY, mouseX, mouseY, offsetX, offsetY, color) {
         ctx.beginPath();
-        ctx.strokeStyle = '#222222';
+        ctx.strokeStyle = color;
         ctx.lineWidth = 2;
         ctx.moveTo(originX, originY);
         ctx.lineTo(mouseX - offsetX, mouseY - offsetY);

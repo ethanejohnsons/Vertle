@@ -1,34 +1,31 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useCookies } from "react-cookie";
+
 import LZString from 'lz-string';
 import { Button } from 'react-bootstrap';
 
 import { Line } from '../../model/Line';
 import { Vertex } from '../../model/Vertex';
 import { GameState } from '../../model/GameState';
-import './GamePane.css';
+import { getDailyAnswer } from './GameLogic'
+import './GameView.css';
 
 export function GamePane(props) {
-    const { width, height, outputGuessHistory, setGameNumber, cookie, setCookie, removeCookie } = props;
-    const moment = require('moment');
+    const { width, height, setGameNumber, guessHistory, setGuessHistory } = props;
 
-    const baseColor = '#222222';
-    const correctColor = '#8DBA69';
-    const closeColor = '#DCC55B';
-    const lastColor = '#AAAAAA';
-
-    const { server, devServer, isDev } = require('../../config.json');
-
-    // Game States
-    const [ gameState, setGameState ] = useState(new GameState([], [], baseColor, closeColor, correctColor, lastColor, width, height, false));
-    const [ guessHistory, setGuessHistory ] = useState([]);
-    const [ currentGuess, setCurrentGuess ] = useState(null);
-    const [ currentVertex, setCurrentVertex ] = useState(null);
-    const [ gameHasEnded, setGameHasEnded ] = useState(false);
-    const [ hasWon, setHasWon ] = useState(false);
+    // Cookies
+    const [ cookie, setCookie, removeCookie] = useCookies(['gameState']);
 
     // Daily Answer Info
     const [ answer, setAnswer] = useState("");
     const [ vertexCount, setVertexCount ] = useState(0);
+
+    // Game States
+    const [ gameState, setGameState ] = useState(new GameState([], []));
+    const [ currentGuess, setCurrentGuess ] = useState(null);
+    const [ currentVertex, setCurrentVertex ] = useState(null);
+    const [ gameHasEnded, setGameHasEnded ] = useState(false);
+    const [ hasWon, setHasWon ] = useState(false);
 
     // Canvas/Mouse States
     const [ isMouseDown, setIsMouseDown ] = useState(false);
@@ -36,53 +33,42 @@ export function GamePane(props) {
     const [ mouseY, setMouseY ] = useState(0);
     const canvas = useRef(null);
 
-    useEffect(() => render());
-
+    // On render - once
     useEffect(() => {
+        // Document Setup
         document.body.style.overflow = "hidden";
         canvas.current.getContext("2d").imageSmoothingEnabled = false;
 
-        let api = isDev ? devServer : server;
-        let date = moment().format('YYYY-MM-DD');
-        let gameHasEnded = false;
+        let data = getDailyAnswer();
 
-        if (!gameHasEnded) {
-            fetch(`${api}/daily?date=${date}`, {
-                method: 'GET',
-                headers: {
-                    accept: 'application/json',
-                }
-            }).then(response => response.json()).then(data => {
-                setAnswer(data.answer);
-                setVertexCount(data.vertices);
-                setGameNumber(data.gameNumber);
-                setupGameState(data.vertices);
+        setAnswer(data.answer);
+        setVertexCount(data.vertices);
+        setGameNumber(data.gameNumber);
+        setupGameState(data.vertices);
 
-                if (guessHistory.length === 0 && cookie['history']) {
-                    let history = JSON.parse(LZString.decompressFromBase64(cookie['history']));
-                    history = history.map(state => new GameState(state.vertices, state.lines, baseColor, closeColor, correctColor, lastColor, state.verified));
-                    history.forEach(state => state.cleanFromJSON());
-
-                    gameHasEnded = cookie['gameHasEnded'] === 'true';
-
-                    setGuessHistory(history);
-                    setGameHasEnded(gameHasEnded);
-                    setHasWon(cookie['hasWon'] === 'true');
-
-                    if (cookie['gameHasEnded'] === 'true') {
-                        let answerState = GameState.generateAnswerState(data.answer, data.vertices, width, height, baseColor, correctColor);
-                        setGameState(answerState);
-                        setCurrentGuess(answerState);
-                    } else {
-                        setCurrentGuess(gameState);
-                    }
-
-                    if (cookie['gameHasEnded'] === 'true') {
-                        outputGuessHistory(history);
-                    }
-                }
-            }).catch(err => console.log(err));
-        }
+            // if (guessHistory.length === 0 && cookie['history']) {
+            //     let history = JSON.parse(LZString.decompressFromBase64(cookie['history']));
+            //     history = history.map(state => new GameState(state.vertices, state.lines, baseColor, closeColor, correctColor, lastColor, state.verified));
+            //     history.forEach(state => state.cleanFromJSON());
+            //
+            //     setGameHasEnded(cookie['gameHasEnded'] === 'true');
+            //
+            //     setGuessHistory(history);
+            //     setGameHasEnded(gameHasEnded);
+            //     setHasWon(cookie['hasWon'] === 'true');
+            //
+            //     if (cookie['gameHasEnded'] === 'true') {
+            //         let answerState = GameState.generateAnswerState(data.answer, data.vertices, width, height, baseColor, correctColor);
+            //         setGameState(answerState);
+            //         setCurrentGuess(answerState);
+            //     } else {
+            //         setCurrentGuess(gameState);
+            //     }
+            //
+            //     if (cookie['gameHasEnded'] === 'true') {
+            //         outputGuessHistory(history);
+            //     }
+            // }
     }, []);
 
     useEffect(() => {
@@ -101,31 +87,18 @@ export function GamePane(props) {
         setCookie("history", LZString.compressToBase64(JSON.stringify(guessHistory)), { expires: date });
         setCookie("gameHasEnded", gameHasEnded.toString(), {  expires: date });
         setCookie("hasWon", hasWon, { expires: date });
-    }, [currentGuess, guessHistory, hasWon, gameHasEnded]);
+    }, [currentGuess, hasWon, gameHasEnded]);
 
-    const render = () => {
+    // On render - each frame
+    useEffect(() => {
         let ctx = canvas.current.getContext("2d");
 
         // Clear the screen
         ctx.clearRect(0, 0, width, height);
 
-        const drawDraggable = () => {
-            // Click & Drag
-            if (isMouseDown && currentVertex) {
-                Line.drawDraggable(ctx,
-                    currentVertex.x,
-                    currentVertex.y,
-                    mouseX,
-                    mouseY,
-                    canvas.current.offsetLeft,
-                    canvas.current.offsetTop,
-                    gameState.baseColor
-                );
-            }
-        }
-
-        if (currentGuess === gameState) {
-            drawDraggable();
+        // Click & Drag
+        if (isMouseDown && currentVertex && currentGuess === gameState) {
+            Line.drawDraggable(ctx, currentVertex.x, currentVertex.y, mouseX, mouseY, canvas.current.offsetLeft, canvas.current.offsetTop, GameState.baseColor);
         }
 
         if (currentGuess) {
@@ -145,12 +118,11 @@ export function GamePane(props) {
 
                     vertex.draw(ctx, connectedLines);
                 });
-
             } else {
                 currentGuess.draw(ctx);
             }
         }
-    }
+    });
 
     const onGuessNavigation = (direction) => {
         let index = guessHistory.indexOf(currentGuess);
@@ -178,7 +150,7 @@ export function GamePane(props) {
         let gameHasEnded = false;
 
         if (guess.hasWon || history.length >= 5) {
-            outputGuessHistory(history);
+            setGuessHistory(history);
             gameHasEnded = true;
 
             if (!guess.hasWon) {
@@ -221,7 +193,7 @@ export function GamePane(props) {
     }, [mouseX, mouseY, isMouseDown]);
 
     const setupGameState = (vertexCount) => {
-        let gameState = new GameState([], [], baseColor, closeColor, correctColor, lastColor, false);
+        let gameState = new GameState([], [], false);
 
         Array(vertexCount).fill(null).map((_, i) => i).map(i => {
             let pos = Vertex.getPosition(i, vertexCount, Math.min(width * 0.45, height * 0.45));
