@@ -4,17 +4,19 @@ import { Modal, Button, Toast, ToastContainer } from 'react-bootstrap';
 import { BsFillShareFill } from "react-icons/bs";
 import 'bootstrap/dist/css/bootstrap.min.css';
 
-import { createShareable} from "../../util/ShareBuilder";
+import { createShareable} from "./util/ShareBuilder";
 import './Modals.css';
 
 export function ShareModal(props) {
-    const { setClosed, isOpen, guessHistory, gameNumber } = props;
+    const { setClosed, isOpen, shareState } = props;
     const [ text, setText ] = useState("");
     const [ isToastVisible, setIsToastVisible ] = useState(false);
 
     useEffect(() => {
-        setText(createShareable(gameNumber, guessHistory));
-    }, [guessHistory, gameNumber]);
+        if (shareState) {
+            setText(createShareable(shareState));
+        }
+    }, [shareState]);
 
     const onShare = () => {
         if (navigator.share && navigator.userAgent.includes("Mobile")) {
@@ -42,10 +44,10 @@ export function ShareModal(props) {
                         <header className="m-head">Share this game with your friends!</header>
                         <div className="m-body">
                             <p>https://vertle-game.com/</p>
-                            { guessHistory.length === 0 &&
+                            { !shareState &&
                                 <p>After you complete today's puzzle, you'll be able to share your score with your friends.</p>
                             }
-                            { guessHistory.length > 0 &&
+                            { shareState &&
                                 <div className="m-shareable">
                                     <p>{ text }</p>
                                     <Button variant="outline-dark" onClick={onShare}>

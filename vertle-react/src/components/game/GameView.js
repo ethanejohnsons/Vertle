@@ -1,17 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useCookies } from "react-cookie";
-
-import LZString from 'lz-string';
 import { Button } from 'react-bootstrap';
+import moment from "moment";
 
-import { Line } from '../../model/Line';
-import { Vertex } from '../../model/Vertex';
-import { GameState } from '../../model/GameState';
-import { getDailyAnswer } from './GameLogic'
+import { Line } from './model/Line';
+import { Vertex } from './model/Vertex';
+import { GameState } from './model/GameState';
+import { Convert } from './math/VertleMath';
+
 import './GameView.css';
 
-export function GamePane(props) {
-    const { width, height, setGameNumber, guessHistory, setGuessHistory } = props;
+const { server, devServer, isDev } = require('../../config.json');
+
+export function GameView(props) {
+    const { width, height, guesses, setShareState } = props;
 
     // Cookies
     const [ cookie, setCookie, removeCookie] = useCookies(['gameState']);
@@ -19,77 +21,107 @@ export function GamePane(props) {
     // Daily Answer Info
     const [ answer, setAnswer] = useState("");
     const [ vertexCount, setVertexCount ] = useState(0);
+    const [ gameNumber, setGameNumber ] = useState(0);
 
-    // Game States
-    const [ gameState, setGameState ] = useState(new GameState([], []));
-    const [ currentGuess, setCurrentGuess ] = useState(null);
-    const [ currentVertex, setCurrentVertex ] = useState(null);
-    const [ gameHasEnded, setGameHasEnded ] = useState(false);
+    // Game State
+    const [ mode, setMode ] = useState(0);
+    const [ workingState, setWorkingState ] = useState("");
+    const [ selectedState, setSelectedState ] = useState("");
+    const [ stateHistory, setStateHistory ] = useState([]);
+    const [ gameState, setGameState ] = useState(new GameState("", width, height));
+
+    const hasGameEnded = () => hasWon || stateHistory.length > guesses - 1;
     const [ hasWon, setHasWon ] = useState(false);
 
-    // Canvas/Mouse States
+    const [ currentVertex, setCurrentVertex ] = useState(null);
+
+    // Canvas/Mouse
     const [ isMouseDown, setIsMouseDown ] = useState(false);
     const [ mouseX, setMouseX ] = useState(0);
     const [ mouseY, setMouseY ] = useState(0);
     const canvas = useRef(null);
 
-    // On render - once
+    // Rebuild cached game state each time a new state is selected.
+    useEffect(() => {
+        let gameState = new GameState(selectedState, width, height, stateHistory[stateHistory.length - 1]);
+
+        // If the state is a previous guess, show the hint via the answer.
+        if (stateHistory.includes && stateHistory.includes(selectedState)) {
+            gameState.buildVertices(width, height, answer);
+            gameState.buildLines();
+        }
+
+        if (gameState.previous) {
+            gameState.previous.buildVertices(width, height, answer);
+        }
+
+        setGameState(gameState);
+    }, [stateHistory, selectedState, answer, width, height]);
+
+    useEffect(() => {
+        if (hasWon) {
+            setShareState({
+                history: stateHistory,
+                gameNumber: gameNumber,
+                answer: answer
+            });
+        }
+    }, [hasWon]);
+
+    // If the working state is ever modified, the selected state should be assigned.
+    useEffect(() => {
+        setSelectedState(workingState);
+    }, [workingState]);
+
+    /**
+     * Called once on initial page render.
+     */
     useEffect(() => {
         // Document Setup
         document.body.style.overflow = "hidden";
         canvas.current.getContext("2d").imageSmoothingEnabled = false;
 
-        let data = getDailyAnswer();
+        fetch(`${isDev ? devServer : server}/daily?date=${moment().format('YYYY-MM-DD')}`, {
+            method: 'GET',
+            headers: {
+                accept: 'application/json',
+            }
+        }).then(res => res.json()).then(data => {
+            let answer = data.simpleAnswer;
+            let gameNumber = data.gameNumber;
+            let vertexCount = Convert.toVertexCountFromLength(answer.length);
 
-        setAnswer(data.answer);
-        setVertexCount(data.vertices);
-        setGameNumber(data.gameNumber);
-        setupGameState(data.vertices);
+            setAnswer(answer);
+            setVertexCount(vertexCount);
+            setGameNumber(gameNumber);
 
-            // if (guessHistory.length === 0 && cookie['history']) {
-            //     let history = JSON.parse(LZString.decompressFromBase64(cookie['history']));
-            //     history = history.map(state => new GameState(state.vertices, state.lines, baseColor, closeColor, correctColor, lastColor, state.verified));
-            //     history.forEach(state => state.cleanFromJSON());
-            //
-            //     setGameHasEnded(cookie['gameHasEnded'] === 'true');
-            //
-            //     setGuessHistory(history);
-            //     setGameHasEnded(gameHasEnded);
-            //     setHasWon(cookie['hasWon'] === 'true');
-            //
-            //     if (cookie['gameHasEnded'] === 'true') {
-            //         let answerState = GameState.generateAnswerState(data.answer, data.vertices, width, height, baseColor, correctColor);
-            //         setGameState(answerState);
-            //         setCurrentGuess(answerState);
-            //     } else {
-            //         setCurrentGuess(gameState);
-            //     }
-            //
-            //     if (cookie['gameHasEnded'] === 'true') {
-            //         outputGuessHistory(history);
-            //     }
+            // try {
+                // setStateHistory(JSON.parse(cookie['stateHistory']));
+                // setWorkingState(JSON.parse(cookie['workingState']));
+            // } catch (err) {
+                setWorkingState(getBaseState(answer.length));
+                setStateHistory([]);
             // }
+        }).catch(console.error);
     }, []);
 
+    /**
+     * Writes to cookies so that the state persists for the rest of the day.
+     */
     useEffect(() => {
-        setCurrentGuess(gameState);
-    }, [gameState]);
-
-    // Write to cookie so that state persists for the rest of the day.
-    useEffect(() => {
-        removeCookie('history');
-        removeCookie('gameHasEnded');
-        removeCookie('hasWon');
+        removeCookie('stateHistory');
+        removeCookie('workingState');
 
         let date = new Date();
         date.setDate(date.getDate() + 1);
         date.setHours(0, 0, 0, 0);
-        setCookie("history", LZString.compressToBase64(JSON.stringify(guessHistory)), { expires: date });
-        setCookie("gameHasEnded", gameHasEnded.toString(), {  expires: date });
-        setCookie("hasWon", hasWon, { expires: date });
-    }, [currentGuess, hasWon, gameHasEnded]);
+        setCookie('stateHistory', JSON.stringify(stateHistory), { expires: date });
+        setCookie('workingState', JSON.stringify(workingState), { expires: date });
+    }, [workingState, stateHistory]);
 
-    // On render - each frame
+    /**
+     * Called on each render of the page.
+     */
     useEffect(() => {
         let ctx = canvas.current.getContext("2d");
 
@@ -97,82 +129,75 @@ export function GamePane(props) {
         ctx.clearRect(0, 0, width, height);
 
         // Click & Drag
-        if (isMouseDown && currentVertex && currentGuess === gameState) {
+        if (isMouseDown && currentVertex) {
             Line.drawDraggable(ctx, currentVertex.x, currentVertex.y, mouseX, mouseY, canvas.current.offsetLeft, canvas.current.offsetTop, GameState.baseColor);
         }
 
-        if (currentGuess) {
-            if (!gameHasEnded && currentGuess === gameState && guessHistory[guessHistory.length - 1]) {
-                currentGuess.lines.forEach(line => line.draw(ctx));
-                guessHistory[guessHistory.length - 1].vertices.forEach(vertex => {
-                    let possibleLines = Line.fromVertex(vertex);
-                    let connectedLines = 0;
+        if (!hasGameEnded() && selectedState === workingState && gameState.previous) {
+            gameState.lines.forEach(line => line.draw(ctx));
 
-                    for (let i = 0; i < possibleLines.length; i++) {
-                        for (let j = 0; j < guessHistory[guessHistory.length - 1].lines.length; j++) {
-                            if (possibleLines[i] === guessHistory[guessHistory.length - 1].lines[j].index) {
-                                connectedLines++;
-                            }
-                        }
-                    }
-
-                    vertex.draw(ctx, connectedLines);
-                });
-            } else {
-                currentGuess.draw(ctx);
-            }
+            gameState.previous.vertices.forEach(vertex => {
+                let connectedLines = Vertex.getConnectedLines(gameState.previous, vertex.index);
+                vertex.draw(ctx, connectedLines.length);
+            });
+        } else {
+            gameState.draw(ctx, selectedState !== workingState);
         }
     });
 
+    /**
+     * @returns {string} a string of zeroes of the same length as the {@link answer}
+     */
+    const getBaseState = (length) => {
+        return "".padStart(length ? length : answer.length, "0");
+    }
+
+    /**
+     * Handles left and right button clicks.
+     * @param direction the direction to move through the {@link stateHistory}
+     */
     const onGuessNavigation = (direction) => {
-        let index = guessHistory.indexOf(currentGuess);
+        let index = stateHistory.indexOf(selectedState);
 
         if (direction === -1) {
-            if (currentGuess === gameState) {
-                setCurrentGuess(guessHistory[guessHistory.length - 1]);
+            if (!hasGameEnded() && selectedState === workingState) {
+                setSelectedState(stateHistory[stateHistory.length - 1]);
             } else {
-                setCurrentGuess(guessHistory[index - 1]);
+                setSelectedState(stateHistory[index - 1]);
             }
         }
 
         if (direction === 1) {
-            if (index === guessHistory.length - 1) {
-                setCurrentGuess(gameState);
+            if (index === stateHistory.length - 1) {
+                setSelectedState(workingState);
             } else {
-                setCurrentGuess(guessHistory[index + 1]);
+                setSelectedState(stateHistory[index + 1]);
             }
         }
     }
 
-    const onCheckAnswerClick = () => {
-        let history = guessHistory;
-        let guess = gameState.verifyAndReturn(answer);
-        let gameHasEnded = false;
+    /**
+     * Handles the "Submit" button click. Checks whether the user's guess
+     * is correct and if so, generate a new share state.
+     */
+    const onSubmit = () => {
+        setStateHistory(prevStateHistory => [...prevStateHistory, workingState]);
 
-        if (guess.hasWon || history.length >= 5) {
-            setGuessHistory(history);
-            gameHasEnded = true;
+        let hasWon = answer === workingState;
+        setHasWon(hasWon);
 
-            if (!guess.hasWon) {
-                let answerState = GameState.generateAnswerState(answer, vertexCount, width, height, baseColor, correctColor);
-                setGameState(answerState);
-                setCurrentGuess(answerState);
-            }
+        if (hasWon || stateHistory.length >= guesses - 1) {
+            setWorkingState(answer);
+        } else {
+            setWorkingState(getBaseState(answer.length));
         }
-
-        if (!(history.length >= 5) && !guess.hasWon) {
-            setupGameState(vertexCount);
-        }
-
-        history.push(guess);
-        setGameHasEnded(gameHasEnded);
-        setHasWon(guess.hasWon);
-        setGuessHistory(history);
     };
 
-    // On mouse click or move
+    /**
+     * Handles all mouse movement/clicking. Includes touch screens.
+     */
     useEffect(() => {
-        if (!gameHasEnded && isMouseDown) {
+        if (workingState && !hasGameEnded() && isMouseDown) {
             let offsetX = canvas.current.offsetLeft;
             let offsetY = canvas.current.offsetTop;
             let ex = mouseX - offsetX;
@@ -180,36 +205,29 @@ export function GamePane(props) {
 
             gameState.vertices.forEach(vertex => {
                 if (vertex.isCursorOver(ex, ey)) {
-                    vertex.onClick(gameState, currentVertex, setCurrentVertex)
+                    if (currentVertex === null) {
+                        setCurrentVertex(vertex);
+                    } else if (currentVertex.index !== vertex.index) {
+                        setWorkingState(vertex.onClick(workingState, currentVertex, vertexCount));
+                        setCurrentVertex(null);
+                    }
                 }
             });
 
-            if (isMouseDown && currentGuess !== gameState) {
-                setCurrentGuess(gameState);
+            if (isMouseDown && selectedState !== workingState) {
+                setSelectedState(workingState);
             }
         } else {
             setCurrentVertex(null);
         }
     }, [mouseX, mouseY, isMouseDown]);
 
-    const setupGameState = (vertexCount) => {
-        let gameState = new GameState([], [], false);
-
-        Array(vertexCount).fill(null).map((_, i) => i).map(i => {
-            let pos = Vertex.getPosition(i, vertexCount, Math.min(width * 0.45, height * 0.45));
-            let x = pos[0] + (width * 0.5);
-            let y = pos[1] + (height * 0.5);
-            gameState.vertices.push(new Vertex(i, x, y, gameState.baseColor));
-        });
-
-        setGameState(gameState);
-        setCurrentVertex(null);
-        setCurrentGuess(gameState);
-        return gameState;
-    }
-
-    const endMessage = (guessesLeft) => {
-        switch (guessesLeft) {
+    /**
+     * Gets a message to display based on the user's guess count at the end of the game.
+     * @returns {string} the response string
+     */
+    const getEndMessage = () => {
+        switch (guesses - stateHistory.length) {
             case 5:
                 return 'Sus. 🤨'
             case 4:
@@ -235,34 +253,32 @@ export function GamePane(props) {
                 <Button
                     style={{ borderWidth: 2 }}
                     onClick={() => onGuessNavigation(-1)}
-                    disabled={guessHistory.length === 0 || guessHistory[0] === currentGuess}
+                    disabled={stateHistory.length === 0 || stateHistory[0] === selectedState}
                     variant="outline-dark">{"<"}</Button>
                 <Button
                     style={{ width: 100, borderWidth: 2 }}
                     variant="outline-dark"
-                    disabled={gameState.lines.length === 0 || gameHasEnded}
-                    onClick={onCheckAnswerClick}
+                    disabled={gameState.lines.length === 0 || selectedState !== workingState || hasGameEnded()}
+                    onClick={onSubmit}
                 >Submit</Button>
                 <Button
                     style={{ width: 100, borderWidth: 2 }}
                     variant="outline-dark"
-                    disabled={gameState.lines.length === 0 || gameHasEnded}
-                    onClick={() => setupGameState(vertexCount)}
+                    disabled={gameState.lines.length === 0 || selectedState !== workingState || hasGameEnded()}
+                    onClick={() => setWorkingState(getBaseState(answer.length))}
                     >Clear</Button>
                 <Button
                     style={{ borderWidth: 2 }}
                     onClick={() => onGuessNavigation(1)}
-                    disabled={currentGuess === gameState}
+                    disabled={selectedState === workingState}
                     variant="outline-dark">{">"}</Button>
             </div>
             <hr size={5} className="gamePane-divider"/>
             <p style={{ textAlign: "center" }}>{
-                gameHasEnded ? endMessage(6 - guessHistory.length) : `${6 - guessHistory.length} guess${6 - guessHistory.length === 1 ? `` : `es`} left.`}
+                hasGameEnded() ? getEndMessage() : `${guesses - stateHistory.length} guess${guesses - stateHistory.length === 1 ? `` : `es`} left.`}
             </p>
             <canvas
-                ref={canvas}
-                width={width}
-                height={height}
+                ref={canvas} width={width} height={height}
                 onMouseUp={(e) => {
                     setMouseX(e.clientX);
                     setMouseX(e.clientY);
@@ -277,7 +293,6 @@ export function GamePane(props) {
                     setMouseX(e.clientX);
                     setMouseY(e.clientY);
                 }}
-
                 onTouchEnd={(e) => {
                     setIsMouseDown(false);
                     setMouseX(e.changedTouches.item(0).pageX);

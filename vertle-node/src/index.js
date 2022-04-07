@@ -1,6 +1,7 @@
 const express = require('express');
 const fs = require('fs');
 const helmet = require('helmet');
+const { simple, moderate, complex }= require('./config.json');
 
 const app = express();
 app.use(helmet());
@@ -8,17 +9,23 @@ app.use(helmet());
 const historyFile = 'history.json';
 let entryCache = null;
 
-function generateAnswerOfTheDay(n) {
-    return Math.floor(Math.random() * Math.pow(2, n));
-}
-
 function getAnswerOfTheDay() {
     let today = new Date().toISOString().slice(0, 10);
+
+    const generateAnswerOfTheDay = (n) => {
+        return (Math.floor(Math.random() * Math.pow(2, n))).toString(2).padStart(n, "0");
+    }
 
     if (entryCache && entryCache.date === today.toString()) {
         return entryCache;
     } else {
-        let history = JSON.parse(fs.readFileSync(historyFile));
+        let history;
+
+        try {
+            history = JSON.parse(fs.readFileSync(historyFile));
+        } catch {
+            history = [];
+        }
 
         if (history.length > 0 && history[history.length - 1].date === today.toString()) {
             entryCache = history[history.length - 1];
@@ -26,16 +33,15 @@ function getAnswerOfTheDay() {
             entryCache = {
                 gameNumber: history.length + 1,
                 date: today,
-                answer: generateAnswerOfTheDay(15).toString(2),
-                vertices: 6
+                simpleAnswer: generateAnswerOfTheDay(simple),
+                moderateAnswer: generateAnswerOfTheDay(moderate),
+                complexAnswer: generateAnswerOfTheDay(complex)
             };
 
             history.push(entryCache);
             fs.writeFileSync(historyFile, JSON.stringify(history));
         }
     }
-
-    return entryCache;
 }
 
 const server = app.listen(4000, () => {

@@ -1,7 +1,7 @@
 {
-  "version": "1.0.1",
+  "version": "1.1.0",
   "server": "https://vertle-game.com/api",
-  "devServer": "http://192.168.86.22:4000",
+  "devServer": "http://localhost:4000",
   "isDev": true,
 
   "social": {
