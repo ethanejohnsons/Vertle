@@ -1,47 +1,66 @@
 const express = require('express');
 const fs = require('fs');
+const url = require('url');
 const helmet = require('helmet');
 const { simple, moderate, complex }= require('./config.json');
 
 const app = express();
 app.use(helmet());
 
-const historyFile = 'history.json';
-let entryCache = null;
+const historyCache = loadHistory('history.json');
 
-function getAnswerOfTheDay() {
-    let today = new Date().toISOString().slice(0, 10);
+/**
+ * Loads or creates the history file.
+ * @param fileName the name of the history file
+ * @returns {*[]|any}
+ */
+function loadHistory(fileName) {
+    try {
+        return JSON.parse(fs.readFileSync(fileName));
+    } catch {
+        fs.writeFileSync(fileName, "[]");
+        return [];
+    }
+}
+
+/**
+ * Writes the history cache to disk.
+ * @param fileName the name of the history file
+ */
+function writeHistory(fileName) {
+    try {
+        fs.writeFileSync(fileName, JSON.stringify(historyCache));
+    } catch(err) {
+        console.log(err);
+    }
+}
+
+function getAnswer(today) {
+    if (!today) {
+        today = new Date().toISOString().slice(0, 10);
+    }
 
     const generateAnswerOfTheDay = (n) => {
         return (Math.floor(Math.random() * Math.pow(2, n))).toString(2).padStart(n, "0");
     }
 
-    if (entryCache && entryCache.date === today.toString()) {
-        return entryCache;
-    } else {
-        let history;
-
-        try {
-            history = JSON.parse(fs.readFileSync(historyFile));
-        } catch {
-            history = [];
-        }
-
-        if (history.length > 0 && history[history.length - 1].date === today.toString()) {
-            entryCache = history[history.length - 1];
-        } else {
-            entryCache = {
-                gameNumber: history.length + 1,
-                date: today,
-                simpleAnswer: generateAnswerOfTheDay(simple),
-                moderateAnswer: generateAnswerOfTheDay(moderate),
-                complexAnswer: generateAnswerOfTheDay(complex)
-            };
-
-            history.push(entryCache);
-            fs.writeFileSync(historyFile, JSON.stringify(history));
+    for (let i = 0; i < historyCache.length; i++) {
+        if (historyCache[i].date === today.toString()) {
+            return historyCache[i];
         }
     }
+
+    let answer = {
+        gameNumber: historyCache.length + 1,
+        date: today,
+        simpleAnswer: generateAnswerOfTheDay(simple),
+        moderateAnswer: generateAnswerOfTheDay(moderate),
+        complexAnswer: generateAnswerOfTheDay(complex)
+    };
+
+    historyCache.push(answer);
+    writeHistory('history.json');
+    return answer;
 }
 
 const server = app.listen(4000, () => {
@@ -51,6 +70,7 @@ const server = app.listen(4000, () => {
 });
 
 app.get('/daily', (req, res) => {
+    let data = url.parse(req.url, true).query;
     res.header("Access-Control-Allow-Origin", "*");
-    res.end(JSON.stringify(getAnswerOfTheDay()));
+    res.end(JSON.stringify(getAnswer(data.date)));
 });

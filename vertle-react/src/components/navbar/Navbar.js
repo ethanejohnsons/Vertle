@@ -15,7 +15,7 @@ export function Navbar(props) {
     const [ isSupportModalOpen, setIsSupportModalOpen ] = useState(false);
 
     useEffect(() => {
-        if (shareState) {
+        if (shareState && shareState.history.length > 0 && shareState.setTimer) {
             setTimeout(() => {
                 setIsShareModalOpen(true);
             }, 2000);

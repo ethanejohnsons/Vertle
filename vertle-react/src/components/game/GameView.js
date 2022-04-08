@@ -34,6 +34,7 @@ export function GameView(props) {
     const [ hasWon, setHasWon ] = useState(false);
 
     const [ currentVertex, setCurrentVertex ] = useState(null);
+    const [ shouldOpenShareModal, setShouldOpenShareModal ] = useState(false);
 
     // Canvas/Mouse
     const [ isMouseDown, setIsMouseDown ] = useState(false);
@@ -55,18 +56,20 @@ export function GameView(props) {
             gameState.previous.buildVertices(width, height, answer);
         }
 
-        setGameState(gameState);
-    }, [stateHistory, selectedState, answer, width, height]);
-
-    useEffect(() => {
-        if (hasWon) {
+        if (answer === workingState) {
             setShareState({
                 history: stateHistory,
                 gameNumber: gameNumber,
-                answer: answer
+                answer: answer,
+                setTimer: shouldOpenShareModal
             });
+
+            setShouldOpenShareModal(false);
         }
-    }, [hasWon]);
+
+
+        setGameState(gameState);
+    }, [stateHistory, selectedState, answer, width, height]);
 
     // If the working state is ever modified, the selected state should be assigned.
     useEffect(() => {
@@ -94,14 +97,30 @@ export function GameView(props) {
             setAnswer(answer);
             setVertexCount(vertexCount);
             setGameNumber(gameNumber);
+            setWorkingState(getBaseState(answer.length));
 
-            // try {
-                // setStateHistory(JSON.parse(cookie['stateHistory']));
-                // setWorkingState(JSON.parse(cookie['workingState']));
-            // } catch (err) {
-                setWorkingState(getBaseState(answer.length));
+            if (cookie['stateHistory']) {
+                let stateHistory = cookie['stateHistory'];
+                setStateHistory(stateHistory);
+
+                if (stateHistory.length > 0) {
+                    let hasWon = stateHistory[stateHistory.length - 1] === answer;
+                    setHasWon(hasWon);
+
+                    if (hasWon) {
+                        setWorkingState(stateHistory[stateHistory.length - 1]);
+
+                        setShareState({
+                            history: stateHistory,
+                            gameNumber: gameNumber,
+                            answer: answer,
+                            setTimer: false
+                        });
+                    }
+                }
+            } else {
                 setStateHistory([]);
-            // }
+            }
         }).catch(console.error);
     }, []);
 
@@ -110,14 +129,12 @@ export function GameView(props) {
      */
     useEffect(() => {
         removeCookie('stateHistory');
-        removeCookie('workingState');
 
         let date = new Date();
         date.setDate(date.getDate() + 1);
         date.setHours(0, 0, 0, 0);
         setCookie('stateHistory', JSON.stringify(stateHistory), { expires: date });
-        setCookie('workingState', JSON.stringify(workingState), { expires: date });
-    }, [workingState, stateHistory]);
+    }, [stateHistory]);
 
     /**
      * Called on each render of the page.
@@ -177,20 +194,19 @@ export function GameView(props) {
     }
 
     /**
-     * Handles the "Submit" button click. Checks whether the user's guess
-     * is correct and if so, generate a new share state.
+     * Handles the "Submit" button click. Checks whether the user's guess is correct.
      */
     const onSubmit = () => {
         setStateHistory(prevStateHistory => [...prevStateHistory, workingState]);
+        setHasWon(answer === workingState);
 
-        let hasWon = answer === workingState;
-        setHasWon(hasWon);
-
-        if (hasWon || stateHistory.length >= guesses - 1) {
+        if (answer === workingState || stateHistory.length >= guesses - 1) {
             setWorkingState(answer);
         } else {
             setWorkingState(getBaseState(answer.length));
         }
+
+        setShouldOpenShareModal(answer === workingState);
     };
 
     /**
