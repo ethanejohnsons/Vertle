@@ -13,10 +13,10 @@ import './GameView.css';
 const { server, devServer, isDev } = require('../../config.json');
 
 export function GameView(props) {
-    const { width, height, guesses, setShareState } = props;
+    const { width, height, guesses, difficulty, setDifficulty, setShareState } = props;
 
     // Cookies
-    const [ cookie, setCookie, removeCookie] = useCookies(['gameState']);
+    const [ cookie, setCookie, removeCookie] = useCookies(["gameState"]);
 
     // Daily Answer Info
     const [ answer, setAnswer] = useState("");
@@ -24,13 +24,16 @@ export function GameView(props) {
     const [ gameNumber, setGameNumber ] = useState(0);
 
     // Game State
-    const [ mode, setMode ] = useState(0);
     const [ workingState, setWorkingState ] = useState("");
     const [ selectedState, setSelectedState ] = useState("");
-    const [ stateHistory, setStateHistory ] = useState([]);
     const [ gameState, setGameState ] = useState(new GameState("", width, height));
 
-    const hasGameEnded = () => hasWon || stateHistory.length > guesses - 1;
+    const [ stateHistorySimple, setStateHistorySimple ] = useState([]);
+    const [ stateHistoryModerate, setStateHistoryModerate ] = useState([]);
+    const [ stateHistoryComplex, setStateHistoryComplex] = useState([]);
+    const [ stateHistory, setStateHistory ] = useState([]);
+
+    const hasGameEnded = () => hasWon || (stateHistory && stateHistory.length >= guesses);
     const [ hasWon, setHasWon ] = useState(false);
 
     const [ currentVertex, setCurrentVertex ] = useState(null);
@@ -45,9 +48,10 @@ export function GameView(props) {
     // Rebuild cached game state each time a new state is selected.
     useEffect(() => {
         let gameState = new GameState(selectedState, width, height, stateHistory[stateHistory.length - 1]);
+        setGameState(gameState);
 
         // If the state is a previous guess, show the hint via the answer.
-        if (stateHistory.includes && stateHistory.includes(selectedState)) {
+        if (!(stateHistory.length >= guesses) && (stateHistory.includes(selectedState) || hasWon)) {
             gameState.buildVertices(width, height, answer);
             gameState.buildLines();
         }
@@ -66,15 +70,18 @@ export function GameView(props) {
 
             setShouldOpenShareModal(false);
         }
-
-
-        setGameState(gameState);
-    }, [stateHistory, selectedState, answer, width, height]);
+    }, [stateHistory, selectedState, width, height]);
 
     // If the working state is ever modified, the selected state should be assigned.
     useEffect(() => {
         setSelectedState(workingState);
     }, [workingState]);
+
+    useEffect(() => {
+        if (cookie["difficulty"]) {
+            setDifficulty(parseInt(cookie["difficulty"]));
+        }
+    }, []);
 
     /**
      * Called once on initial page render.
@@ -84,13 +91,53 @@ export function GameView(props) {
         document.body.style.overflow = "hidden";
         canvas.current.getContext("2d").imageSmoothingEnabled = false;
 
+        // Write difficulty cookie; this one is permanent
+        setCookie("difficulty", difficulty);
+
+        setStateHistory([]);
+        setHasWon(false);
+        setShareState(null);
+
+        let stateHistorySimple = cookie['stateHistorySimple'];
+        let stateHistoryModerate = cookie['stateHistoryModerate'];
+        let stateHistoryComplex = cookie['stateHistoryComplex'];
+
+        if (stateHistorySimple && stateHistorySimple.length > 0) {
+            setStateHistorySimple(stateHistorySimple);
+        }
+        if (stateHistoryModerate && stateHistoryModerate.length > 0) {
+            setStateHistoryModerate(stateHistoryModerate);
+        }
+        if (stateHistoryComplex && stateHistoryComplex.length > 0) {
+            setStateHistoryComplex (stateHistoryComplex);
+        }
+
         fetch(`${isDev ? devServer : server}/daily?date=${moment().format('YYYY-MM-DD')}`, {
             method: 'GET',
             headers: {
                 accept: 'application/json',
             }
         }).then(res => res.json()).then(data => {
-            let answer = data.simpleAnswer;
+            let answer;
+
+            switch (difficulty) {
+                case 0:
+                    answer = data.simpleAnswer;
+                    setStateHistory(stateHistorySimple ? stateHistorySimple : []);
+                    break;
+                case 1:
+                    answer = data.moderateAnswer;
+                    setStateHistory(stateHistoryModerate ? stateHistoryModerate : []);
+                    break;
+                case 2:
+                    answer = data.complexAnswer;
+                    setStateHistory(stateHistoryComplex ? stateHistoryComplex : []);
+                    break;
+                default:
+                    answer = data.moderateAnswer;
+                    setStateHistory(stateHistoryModerate ? stateHistoryModerate : []);
+            }
+
             let gameNumber = data.gameNumber;
             let vertexCount = Convert.toVertexCountFromLength(answer.length);
 
@@ -99,42 +146,23 @@ export function GameView(props) {
             setGameNumber(gameNumber);
             setWorkingState(getBaseState(answer.length));
 
-            if (cookie['stateHistory']) {
-                let stateHistory = cookie['stateHistory'];
-                setStateHistory(stateHistory);
+            let hasWon = stateHistory.length < guesses && stateHistory[stateHistory.length - 1] === answer;
+            setHasWon(hasWon);
 
-                if (stateHistory.length > 0) {
-                    let hasWon = stateHistory[stateHistory.length - 1] === answer;
-                    setHasWon(hasWon);
+            if (hasWon || stateHistory.length >= guesses) {
+                setWorkingState(stateHistory[stateHistory.length - 1]);
+            }
 
-                    if (hasWon) {
-                        setWorkingState(stateHistory[stateHistory.length - 1]);
-
-                        setShareState({
-                            history: stateHistory,
-                            gameNumber: gameNumber,
-                            answer: answer,
-                            setTimer: false
-                        });
-                    }
-                }
-            } else {
-                setStateHistory([]);
+            if (hasWon) {
+                setShareState({
+                    history: stateHistory,
+                    gameNumber: gameNumber,
+                    answer: answer,
+                    setTimer: false
+                });
             }
         }).catch(console.error);
-    }, []);
-
-    /**
-     * Writes to cookies so that the state persists for the rest of the day.
-     */
-    useEffect(() => {
-        removeCookie('stateHistory');
-
-        let date = new Date();
-        date.setDate(date.getDate() + 1);
-        date.setHours(0, 0, 0, 0);
-        setCookie('stateHistory', JSON.stringify(stateHistory), { expires: date });
-    }, [stateHistory]);
+    }, [difficulty]);
 
     /**
      * Called on each render of the page.
@@ -174,10 +202,10 @@ export function GameView(props) {
      * @param direction the direction to move through the {@link stateHistory}
      */
     const onGuessNavigation = (direction) => {
-        let index = stateHistory.indexOf(selectedState);
+        let index = stateHistory.lastIndexOf(selectedState);
 
         if (direction === -1) {
-            if (!hasGameEnded() && selectedState === workingState) {
+            if (selectedState === workingState && !hasGameEnded()) {
                 setSelectedState(stateHistory[stateHistory.length - 1]);
             } else {
                 setSelectedState(stateHistory[index - 1]);
@@ -197,16 +225,33 @@ export function GameView(props) {
      * Handles the "Submit" button click. Checks whether the user's guess is correct.
      */
     const onSubmit = () => {
-        setStateHistory(prevStateHistory => [...prevStateHistory, workingState]);
-        setHasWon(answer === workingState);
+        let history = [...stateHistory, workingState];
 
-        if (answer === workingState || stateHistory.length >= guesses - 1) {
+        setHasWon(answer === workingState);
+        setShouldOpenShareModal(answer === workingState);
+
+        if (answer === workingState || history.length >= guesses) {
             setWorkingState(answer);
+
+            if (history.length >= guesses) {
+                history = [...stateHistory, answer];
+            }
         } else {
             setWorkingState(getBaseState(answer.length));
         }
 
-        setShouldOpenShareModal(answer === workingState);
+        removeCookie('stateHistorySimple');
+        removeCookie('stateHistoryModerate');
+        removeCookie('stateHistoryComplex');
+
+        let date = new Date();
+        date.setDate(date.getDate() + 1);
+        date.setHours(0, 0, 0, 0);
+        setCookie('stateHistorySimple', JSON.stringify(history), { expires: date });
+        setCookie('stateHistoryModerate', JSON.stringify(history), { expires: date });
+        setCookie('stateHistoryComplex', JSON.stringify(history), { expires: date });
+
+        setStateHistory(history);
     };
 
     /**
@@ -269,7 +314,7 @@ export function GameView(props) {
                 <Button
                     style={{ borderWidth: 2 }}
                     onClick={() => onGuessNavigation(-1)}
-                    disabled={stateHistory.length === 0 || stateHistory[0] === selectedState}
+                    disabled={stateHistory && (stateHistory.length === 0 || stateHistory[0] === selectedState)}
                     variant="outline-dark">{"<"}</Button>
                 <Button
                     style={{ width: 100, borderWidth: 2 }}
@@ -291,7 +336,11 @@ export function GameView(props) {
             </div>
             <hr size={5} className="gamePane-divider"/>
             <p style={{ textAlign: "center" }}>{
-                hasGameEnded() ? getEndMessage() : `${guesses - stateHistory.length} guess${guesses - stateHistory.length === 1 ? `` : `es`} left.`}
+                stateHistory &&
+                (
+                    hasGameEnded() ? getEndMessage() : `${guesses - stateHistory.length} guess${guesses - stateHistory.length === 1 ? `` : `es`} left.`
+                )
+            }
             </p>
             <canvas
                 ref={canvas} width={width} height={height}

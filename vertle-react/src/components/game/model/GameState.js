@@ -67,7 +67,7 @@ export class GameState {
                     let same = true;
 
                     Convert.toLinesFromVertex(i, this.vertexCount).forEach(line => {
-                        if (answer[answer.length - line] !== this.binary[answer.length - line]) {
+                        if (answer[answer.length - 1 - line] !== this.binary[answer.length - 1 - line]) {
                             same = false;
                         }
                     });

@@ -10,13 +10,14 @@ export default function App() {
     const width = window.innerWidth < 500 ? window.innerWidth - (window.innerWidth * 0.1) : 500;
 
     const [ shareState, setShareState ] = useState(null);
+    const [ difficulty, setDifficulty ] = useState(1);
 
     return (
         <div className="vertle-all">
             <div className="vertle-game">
-                <Navbar shareState={shareState}/>
+                <Navbar shareState={shareState} difficulty={difficulty} setDifficulty={setDifficulty}/>
                 <hr size={5} className="vertle-divider"/>
-                <GameView width={width} height={height} setShareState={setShareState} guesses={6}/>
+                <GameView width={width} height={height} setShareState={setShareState} guesses={6} difficulty={difficulty} setDifficulty={setDifficulty}/>
             </div>
             <div className="vertle-footer">
                 <p>{`v${version}`}</p>
